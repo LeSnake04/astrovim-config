@@ -3,7 +3,7 @@ local config = {
   -- Configure AstroNvim updates
   updater = {
     remote = "origin", -- remote to use
-    channel = "nightly", -- "stable" or "nightly"
+    channel = "stable", -- "stable" or "nightly"
     version = "latest", -- "latest", tag name, or regex search like "v1.*" to only do updates before v2 (STABLE ONLY)
     branch = "main", -- branch name (NIGHTLY ONLY)
     commit = nil, -- commit hash (NIGHTLY ONLY)
@@ -84,11 +84,10 @@ local config = {
       -- You can disable default plugins as follows:
       -- ["goolord/alpha-nvim"] = { disable = true },
       ["declancm/cinnamon.nvim"] = { disable = true },
-      {
-        "saecki/crates.nvim",
-        requires = { "nvim-lua/plenary.nvim" },
-        config = function() require("crates").setup() end,
-      },
+      -- "mfussenegger/nvim-dap",
+      -- "rcarriga/nvim-dap-ui",
+      -- "Pocco81/dap-buddy.nvim",
+      "rhysd/rust-doc.vim",
       "gpanders/editorconfig.nvim",
       {
         "folke/todo-comments.nvim",
@@ -107,27 +106,103 @@ local config = {
           }
         end,
       },
+      -- {
+      -- "folke/trouble.nvim",
+      -- requires = "kyazdani42/nvim-web-devicons",
+      -- config = function()
+      --   require("trouble").setup {
+      --     -- your configuration comes here
+      -- or leave it empty to use the default settings
+      -- refer to the configuration section below
+      -- }
+      -- end,
+      -- },
+      "dense-analysis/ale",
+      "brooth/far.vim",
+      "https://github.com/kylechui/nvim-surround",
+      -- "iamcco/markdown-preview.nvim",
+      "folke/lsp-colors.nvim",
+      "vim-autoformat/vim-autoformat",
+      -- DAP:
+      { "mfussenegger/nvim-dap" },
       {
-        "folke/trouble.nvim",
-        requires = "kyazdani42/nvim-web-devicons",
+        "rcarriga/nvim-dap-ui",
+        requires = { "nvim-dap", "rust-tools.nvim" },
         config = function()
-          require("trouble").setup {
-            -- your configuration comes here
-            -- or leave it empty to use the default settings
-            -- refer to the configuration section below
+          local dapui = require "dapui"
+          dapui.setup {}
+
+          local dap = require "dap"
+          dap.listeners.after.event_initialized["dapui_config"] = function() dapui.open() end
+          dap.listeners.before.event_terminated["dapui_config"] = function() dapui.close() end
+          dap.listeners.before.event_exited["dapui_config"] = function() dapui.close() end
+
+          -- DAP mappings:
+          local map = vim.api.nvim_set_keymap
+          map("n", "<F5>", ":lua require('dap').continue()<cr>", { desc = "Continue" })
+          map("n", "<F10>", ":lua require('dap').step_over()<cr>", { desc = "Step over" })
+          map("n", "<F11>", ":lua require('dap').step_into()<cr>", { desc = "Step into" })
+          map("n", "<F12>", ":lua require('dap').step_out()<cr>", { desc = "Step out" })
+          map("n", "<leader>bp", ":lua require('dap').toggle_breakpoint()<cr>", { desc = "Toggle breakpoint" })
+          map(
+            "n",
+            "<leader>Bp",
+            ":lua require('dap').set_breakpoint(vim.fn.input('Breakpoint condition: '))<cr>",
+            { desc = "Set conditional breakpoint" }
+          )
+          map(
+            "n",
+            "<leader>lp",
+            ":lua require('dap').set_breakpoint(nil, nil, vim.fn.input('Logpoint message: '))<cr>",
+            { desc = "Set logpoint" }
+          )
+          map("n", "<leader>rp", ":lua require('dap').repl.open()<cr>", { desc = "Open REPL" })
+          map("n", "<leader>RR", ":lua require('dap').run_last()<cr>", { desc = "Run last debugged program" })
+          map("n", "<leader>XX", ":lua require('dap').terminate()<cr>", { desc = "Terminate program being debugged" })
+          map("n", "<leader>du", ":lua require('dap').up()<cr>", { desc = "Up one frame" })
+          map("n", "<leader>dd", ":lua require('dap').down()<cr>", { desc = "Down one frame" })
+        end,
+      },
+      {
+        "mfussenegger/nvim-dap-python",
+      },
+      -- Rust support
+      {
+        "simrat39/rust-tools.nvim",
+        after = { "mason-lspconfig.nvim" },
+        -- Is configured via the server_registration_override installed below!
+        config = function()
+          require("rust-tools").setup {
+            server = astronvim.lsp.server_settings "rust_analyzer",
+            tools = {
+              inlay_hints = {
+                parameter_hints_prefix = "  ",
+                other_hints_prefix = "  ",
+              },
+            },
           }
         end,
       },
-      "dense-analysis/ale",
-      "brooth/far.vim",
-      "iamcco/markdown-preview.nvim",
-      "folke/lsp-colors.nvim",
-      "vim-autoformat/vim-autoformat",
       {
-        "simrat39/rust-tools.nvim",
+        "Saecki/crates.nvim",
+        after = "nvim-cmp",
         config = function()
-          require("rust-tools").inlay_hints.enable()
-        end
+          require("crates").setup()
+
+          local cmp = require "cmp"
+          local config = cmp.get_config()
+          table.insert(config.sources, { name = "crates", priority = 1100 })
+          cmp.setup(config)
+
+          -- Crates mappings:
+          local map = vim.api.nvim_set_keymap
+          map("n", "<leader>Ct", ":lua require('crates').toggle()<cr>", { desc = "Toggle extra crates.io information" })
+          map("n", "<leader>Cr", ":lua require('crates').reload()<cr>", { desc = "Reload information from crates.io" })
+          map("n", "<leader>CU", ":lua require('crates').upgrade_crate()<cr>", { desc = "Upgrade a crate" })
+          map("v", "<leader>CU", ":lua require('crates').upgrade_crates()<cr>", { desc = "Upgrade selected crates" })
+          map("n", "<leader>CA", ":lua require('crates').upgrade_all_crates()<cr>", { desc = "Upgrade all crates" })
+          map("n", "<leader>Cd", ":lua require('crates').open_documentation()<cr>", { desc = "Open docs.rs" })
+        end,
       },
     },
     -- All other entries override the setup() call for default plugins
@@ -165,6 +240,9 @@ local config = {
     ["mason-tool-installer"] = {
       ensure_installed = { "prettier", "stylua" },
     },
+    ["rust-tools"] = {
+      inlay_hints = true,
+    },
     packer = {
       compile_path = vim.fn.stdpath "data" .. "/packer_compiled.lua",
     },
@@ -197,6 +275,7 @@ local config = {
 
   -- Extend LSP configuration
   lsp = {
+    skip_setup = { "rust_analyzer" },
     -- enable servers that you already have installed without mason
     servers = {
       -- "pyright"
@@ -249,12 +328,13 @@ local config = {
     n = {
       -- second key is the lefthand side of the map
       -- mappings seen under group name "Buffer"
-      ["<leader>bb"] = { "<cmd>tabnew<cr>", desc = "New tab" },
-      ["<leader>bc"] = { "<cmd>BufferLinePickClose<cr>", desc = "Pick to close" },
-      ["<leader>bj"] = { "<cmd>BufferLinePick<cr>", desc = "Pick to jump" },
-      ["<leader>bt"] = { "<cmd>BufferLineSortByTabs<cr>", desc = "Sort by tabs" },
+      -- ["<leader>bb"] = { "<cmd>tabnew<cr>", desc = "New tab" },
+      -- ["<leader>bc"] = { "<cmd>BufferLinePickClose<cr>", desc = "Pick to close" },
+      -- ["<leader>bj"] = { "<cmd>BufferLinePick<cr>", desc = "Pick to jump" },
+      -- ["<leader>bT"] = { "<cmd>BufferLineSortByTabs<cr>", desc = "Sort by tabs" },
       -- quick save
       -- ["<C-s>"] = { ":w!<cr>", desc = "Save File" },  -- change description but the same command
+      ["<leader>lt"] = { "<cmd>TodoTelescope<cr>", desc = "Show todos in Telescope" },
     },
     t = {
       -- setting a mapping to false will disable it
@@ -273,6 +353,7 @@ local config = {
           -- third key is the key to bring up next level and its displayed
           -- group name in which-key top level menu
           ["b"] = { name = "Buffer" },
+          ["h"] = { name = "Git gutter" },
         },
       },
     },
